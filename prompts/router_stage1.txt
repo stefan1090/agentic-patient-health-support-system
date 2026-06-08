@@ -38,13 +38,17 @@ Read the user message and decide:
 6. whether the message includes a result to interpret
 7. whether a clinician-validated plan already exists
 8. whether location or health system context is known
-9. a brief reason
+9. the routing confidence
+10. a brief reason
 
 Agent definitions:
 
 1. clinical_assessment
-Use this when the user describes symptoms, signs, a suspected illness, a specific condition, clinical worsening, progression, relapse, flare, change in condition, or asks what a described clinical picture may suggest.
+Use this when the user describes or mentions symptoms, signs, a suspected illness, a disease, a condition, clinical worsening, progression, relapse, flare, change in condition, or asks what a described clinical picture may suggest.
 This also includes general questions about a specific disease or condition when the real need is to understand its clinical meaning, presentation, recognition, progression, or significance, even if the question is not explicitly framed about the user personally.
+General questions or fragments about what a condition may be, whether something is normal or clinically concerning, what a condition looks like, how it is recognized, whether something could represent a disease/state, or what it may mean clinically route to clinical_assessment.
+Questions asking whether something should be evaluated, taken seriously, or considered concerning also route to clinical_assessment, even if the user does not name a disease or provide a full symptom list.
+Any mention of abnormality, signs, symptoms, disease/condition, possible clinical concern, needing assessment, checking, evaluation, or whether something is normal vs concerning should favor clinical_assessment, even if the message is short, fragmentary, or not phrased as a full question.
 
 2. interpretation
 Use this only when the user asks to understand:
@@ -59,7 +63,7 @@ Do not route to interpretation merely because the user mentions:
 - doctor instructions
 
 3. intervention
-Use this when the user's question is centered on a specific intervention, whether pharmacological or non-pharmacological. This includes:
+Use this when the user's question mentions or centers on treatment, medication, medicine, prescriptions, meds, therapy, or a specific intervention, whether pharmacological or non-pharmacological. This includes:
 - named medications
 - doses
 - stopping, switching, adjusting, starting, or adding treatment
@@ -69,7 +73,8 @@ Use this when the user's question is centered on a specific intervention, whethe
 - biomagnetism
 - acupuncture
 - digital tools functioning as concrete interventions
-- any question whose main uncertainty revolves around a concrete intervention
+- any question whose main uncertainty revolves around treatment or intervention
+Also use this for general treatment-oriented questions, including what treatment is usually used, whether medication is commonly used, whether therapy may help, whether treatment may be needed, what is typically recommended, or what intervention approach is generally considered, even if no specific drug or named intervention is mentioned. Preventive treatment also routes to intervention when it involves a concrete medication, therapy, supplement, procedure, or other intervention.
 
 4. management
 Use this when the user asks for:
@@ -101,10 +106,10 @@ Use this when the user asks about:
 - what kind of facility or service is appropriate
 - how to verify or confirm service-related information
 This agent should be framed as patient-facing health system navigation, not just simple access.
+Also use this for broadly phrased care-navigation questions, including what type of doctor/service usually handles a condition, where people usually go, how care is typically accessed, whether referral is usually needed, how coverage/benefits/eligibility/paperwork generally work, or how patients usually navigate this kind of issue.
 
 6. education
 Use this when the user asks about:
-- prevention
 - health promotion
 - healthy habits
 - general health literacy
@@ -113,6 +118,17 @@ Use this when the user asks about:
 - myths
 - broad informational understanding
 Education should not be the default bucket for general questions about a specific disease or condition. If the question is about a specific disease and the user is trying to understand its clinical meaning, presentation, recognition, progression, or significance, prefer clinical_assessment.
+Education is not a fallback for diagnosis-oriented, treatment-oriented, or health-services-oriented questions phrased in general language.
+Education is not a broad prevention bucket. Prevention questions that imply symptoms, abnormality, clinical evaluation, screening/testing to see whether something may be present, or preventive treatment/intervention should route to clinical_assessment or intervention by their true focus.
+
+Education exclusion / abnormality gate:
+- Select education only for clearly promotional, healthy-habit, literacy, term-meaning, abbreviation, myth, or broad non-diagnostic informational questions.
+- Absence of a named disease does not imply education.
+- Absence of a personal case does not imply education.
+- Do not use education if the user implies something may be wrong, abnormal, concerning, unusual, serious, clinically meaningful, worth evaluating, needing to be taken seriously, or needing to be considered concerning.
+- If the user mentions signs, symptoms, disease/condition, or asks generally whether something is normal vs concerning, whether it could mean something is wrong, whether it should be checked/evaluated/assessed, or whether it may have clinical significance, prefer clinical_assessment.
+- If the user asks generally about treatment, medication, therapy, whether treatment is needed, or what intervention is typical, prefer intervention.
+- If the user asks generally who handles an issue, where people go, what service is appropriate, how referral works, or how care is accessed, prefer health_services.
 
 Clinical note routing:
 If the user refers to a clinical note, discharge note, progress note, or doctor instruction:
@@ -133,13 +149,18 @@ Always route by the object of uncertainty:
 - uncertainty about a condition, diagnosis, clinical picture, worsening, progression, relapse, flare, or symptoms indicating illness/state -> clinical_assessment
 - uncertainty about a specific intervention, medication, dose, treatment, therapy, supplement, herb, biomagnetism, acupuncture, or other concrete intervention -> intervention
 - uncertainty about what to do, how to cope, how to stay safe, how to handle the situation practically, or how to get through the immediate situation -> management
-- uncertainty about information, concepts, terms, abbreviations, or general understanding -> education
+- uncertainty about health-promotion concepts, healthy habits, medical terms, abbreviations, myths, or broad non-diagnostic literacy -> education
 - uncertainty about where to go, referrals, services, access, specialists, coverage, benefits, paperwork, or getting care -> health_services
 
 Intervention vs management vs health_services:
 - If a specific intervention is the actual focus of uncertainty, prefer intervention.
 - If a specific intervention is only background context but the real question is practical implementation or day-to-day handling, prefer management.
 - If the requested action mainly concerns accessing care, referrals, services, specialists, wait times, where to go, coverage, benefits, paperwork, or how to get care, prefer health_services.
+
+Generality rules:
+- Generality alone does not imply education.
+- Absence of a personal case does not imply education.
+- Questions about what is typically used, typically recommended, typically involved, or typically done should not default to education. Route by the true domain: condition meaning / recognition / concern -> clinical_assessment; treatment or intervention approach -> intervention; care pathway / doctor / clinic / referral / access -> health_services.
 
 Safety / emergency rules:
 - If safety_overlay is true and there is no clear non-crisis / non-emergency content request, set primary_agent = "none" and secondary_agent = "none".
@@ -183,6 +204,14 @@ Location context:
 - known: explicit country, city, region, health system, insurer, or other concrete location/system context.
 - unknown: not clearly provided.
 
+Routing confidence:
+- high: the routing choice is clear and strongly supported by the message; use this for prototypical cases.
+- medium: the routing choice is reasonable, but there is some overlap or ambiguity.
+- low: the router is meaningfully uncertain and another agent is also plausibly supported; use this especially for borderline general questions where the user's true intent is hard to distinguish.
+- Do not use low just because the question is short.
+- If a case could plausibly fit education and another agent, but the other agent is meaningfully supported, do not silently collapse to education. Choose the best route and mark routing_confidence appropriately.
+- Education must not function as a hidden fallback for low-confidence cases.
+
 Priority when multiple content categories appear:
 1. clinical_assessment
 2. interpretation
@@ -202,6 +231,7 @@ Use exactly this schema:
   "has_result_to_interpret": false,
   "plan_status": "none",
   "location_context": "unknown",
+  "routing_confidence": "high",
   "reason": "brief rationale"
 }
 
@@ -219,6 +249,7 @@ Output:
   "has_result_to_interpret": false,
   "plan_status": "none",
   "location_context": "unknown",
+  "routing_confidence": "high",
   "reason": "The user has a suspected condition and symptoms, with a secondary access-to-care need."
 }
 
@@ -234,6 +265,7 @@ Output:
   "has_result_to_interpret": true,
   "plan_status": "none",
   "location_context": "unknown",
+  "routing_confidence": "high",
   "reason": "The user is asking to understand a screening questionnaire score."
 }
 
@@ -249,6 +281,7 @@ Output:
   "has_result_to_interpret": false,
   "plan_status": "none",
   "location_context": "unknown",
+  "routing_confidence": "high",
   "reason": "The user is asking for the meaning of a medical abbreviation from a note."
 }
 
@@ -264,6 +297,7 @@ Output:
   "has_result_to_interpret": false,
   "plan_status": "none",
   "location_context": "unknown",
+  "routing_confidence": "high",
   "reason": "The message is a safety concern without a clear separate content request."
 }
 
@@ -279,6 +313,7 @@ Output:
   "has_result_to_interpret": false,
   "plan_status": "none",
   "location_context": "unknown",
+  "routing_confidence": "high",
   "reason": "The uncertainty is centered on stopping a named medication."
 }
 
@@ -294,5 +329,150 @@ Output:
   "has_result_to_interpret": false,
   "plan_status": "none",
   "location_context": "unknown",
+  "routing_confidence": "high",
   "reason": "The medication is background context, but the request is practical day-to-day handling."
+}
+
+Example 7
+User: "What does postpartum depression look like?"
+Output:
+{
+  "safety_overlay": false,
+  "safety_level": "none",
+  "primary_agent": "clinical_assessment",
+  "secondary_agent": "none",
+  "diagnosis_status": "unknown",
+  "has_result_to_interpret": false,
+  "plan_status": "none",
+  "location_context": "unknown",
+  "routing_confidence": "high",
+  "reason": "The user is asking about the clinical presentation and recognition of a specific condition."
+}
+
+Example 8
+User: "What treatment is usually used for panic disorder?"
+Output:
+{
+  "safety_overlay": false,
+  "safety_level": "none",
+  "primary_agent": "intervention",
+  "secondary_agent": "none",
+  "diagnosis_status": "unknown",
+  "has_result_to_interpret": false,
+  "plan_status": "none",
+  "location_context": "unknown",
+  "routing_confidence": "high",
+  "reason": "The user is asking a general treatment-oriented question."
+}
+
+Example 9
+User: "What kind of doctor usually manages postpartum depression?"
+Output:
+{
+  "safety_overlay": false,
+  "safety_level": "none",
+  "primary_agent": "health_services",
+  "secondary_agent": "none",
+  "diagnosis_status": "unknown",
+  "has_result_to_interpret": false,
+  "plan_status": "none",
+  "location_context": "unknown",
+  "routing_confidence": "high",
+  "reason": "The user is asking what type of clinician or service is usually involved."
+}
+
+Example 10
+User: "What does BID mean?"
+Output:
+{
+  "safety_overlay": false,
+  "safety_level": "none",
+  "primary_agent": "education",
+  "secondary_agent": "none",
+  "diagnosis_status": "unknown",
+  "has_result_to_interpret": false,
+  "plan_status": "none",
+  "location_context": "unknown",
+  "routing_confidence": "high",
+  "reason": "The user is asking for the meaning of a medical abbreviation."
+}
+
+Example 11
+User: "Is this normal or should I worry?"
+Output:
+{
+  "safety_overlay": false,
+  "safety_level": "none",
+  "primary_agent": "clinical_assessment",
+  "secondary_agent": "none",
+  "diagnosis_status": "unknown",
+  "has_result_to_interpret": false,
+  "plan_status": "none",
+  "location_context": "unknown",
+  "routing_confidence": "high",
+  "reason": "The user is asking whether something may be clinically concerning."
+}
+
+Example 12
+User: "Could this mean something is wrong?"
+Output:
+{
+  "safety_overlay": false,
+  "safety_level": "none",
+  "primary_agent": "clinical_assessment",
+  "secondary_agent": "none",
+  "diagnosis_status": "unknown",
+  "has_result_to_interpret": false,
+  "plan_status": "none",
+  "location_context": "unknown",
+  "routing_confidence": "high",
+  "reason": "The user implies a possible abnormality or clinical concern."
+}
+
+Example 13
+User: "Would medication usually be needed for this?"
+Output:
+{
+  "safety_overlay": false,
+  "safety_level": "none",
+  "primary_agent": "intervention",
+  "secondary_agent": "none",
+  "diagnosis_status": "unknown",
+  "has_result_to_interpret": false,
+  "plan_status": "none",
+  "location_context": "unknown",
+  "routing_confidence": "high",
+  "reason": "The user is asking a general treatment-oriented question."
+}
+
+Example 14
+User: "Who would usually handle this kind of problem?"
+Output:
+{
+  "safety_overlay": false,
+  "safety_level": "none",
+  "primary_agent": "health_services",
+  "secondary_agent": "none",
+  "diagnosis_status": "unknown",
+  "has_result_to_interpret": false,
+  "plan_status": "none",
+  "location_context": "unknown",
+  "routing_confidence": "high",
+  "reason": "The user is asking what type of clinician or service usually handles the issue."
+}
+
+Example 15
+User: "How can I reduce my risk of heart disease?"
+Output:
+{
+  "safety_overlay": false,
+  "safety_level": "none",
+  "primary_agent": "education",
+  "secondary_agent": "none",
+  "diagnosis_status": "unknown",
+  "has_result_to_interpret": false,
+  "plan_status": "none",
+  "location_context": "unknown",
+  "routing_confidence": "high",
+  "reason": "The user is asking a health-promotion and risk-reduction literacy question."
 }
