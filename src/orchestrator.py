@@ -246,10 +246,25 @@ def build_agent_prompt(
             "USER INPUT:",
             user_input,
             "ROUTING METADATA:",
-            str(routing),
+            str(generation_routing_metadata(routing)),
         )
         if part
     )
+
+
+def generation_routing_metadata(routing: dict[str, object]) -> dict[str, object]:
+    excluded_fields = {
+        "stage1_prompt_text",
+        "stage1_output_text",
+        "stage2_prompt_text",
+        "stage2_output_text",
+        "llm_router_raw_output",
+    }
+    return {
+        key: value
+        for key, value in routing.items()
+        if key not in excluded_fields
+    }
 
 
 def compose_scaffold_prompt_output(agent_prompts: dict[str, str]) -> str:
