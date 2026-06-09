@@ -43,6 +43,8 @@ OLLAMA_TIMEOUT_SECONDS = 30
 def route_llm(user_input: str, prompts_dir: str = "prompts") -> dict[str, object]:
     """Route with the LLM router, falling back to the rules router on any failure."""
     parsed_output: dict[str, Any] | None = None
+    router_prompt = ""
+    model_output = ""
     try:
         router_prompt = build_router_prompt(user_input, prompts_dir)
         model_output = run_router_model(router_prompt)
@@ -55,6 +57,8 @@ def route_llm(user_input: str, prompts_dir: str = "prompts") -> dict[str, object
             llm_router_success=True,
             llm_router_error="",
             llm_router_raw_output=parsed_output,
+            stage1_prompt_text=router_prompt,
+            stage1_output_text=model_output,
         )
     except Exception as error:
         routing = route_rules(user_input)
@@ -64,6 +68,8 @@ def route_llm(user_input: str, prompts_dir: str = "prompts") -> dict[str, object
             llm_router_success=False,
             llm_router_error=format_llm_router_error(error, parsed_output),
             llm_router_raw_output=parsed_output or {},
+            stage1_prompt_text=router_prompt,
+            stage1_output_text=model_output,
         )
 
 
@@ -73,6 +79,8 @@ def with_llm_debug(
     llm_router_success: bool,
     llm_router_error: str,
     llm_router_raw_output: dict[str, Any],
+    stage1_prompt_text: str = "",
+    stage1_output_text: str = "",
 ) -> dict[str, object]:
     return {
         **routing,
@@ -80,6 +88,8 @@ def with_llm_debug(
         "llm_router_success": llm_router_success,
         "llm_router_error": llm_router_error,
         "llm_router_raw_output": llm_router_raw_output,
+        "stage1_prompt_text": stage1_prompt_text,
+        "stage1_output_text": stage1_output_text,
     }
 
 
@@ -100,15 +110,24 @@ def build_router_prompt(user_input: str, prompts_dir: str = "prompts") -> str:
 
 def route_stage2_topic(user_input: str, prompts_dir: str = "prompts") -> dict[str, str]:
     """Summarize topic for low-confidence routing recovery."""
+    stage2_prompt = ""
+    model_output = ""
     try:
         stage2_prompt = build_stage2_router_prompt(user_input, prompts_dir)
         model_output = run_router_model(stage2_prompt)
         parsed_output = parse_router_output(model_output)
-        return validate_stage2_router_output(normalize_stage2_router_output(parsed_output))
+        routing = validate_stage2_router_output(normalize_stage2_router_output(parsed_output))
+        return {
+            **routing,
+            "stage2_prompt_text": stage2_prompt,
+            "stage2_output_text": model_output,
+        }
     except Exception:
         return {
             "topic_summary": "unknown",
             "reason": "Stage-2 topic summary routing failed.",
+            "stage2_prompt_text": stage2_prompt,
+            "stage2_output_text": model_output,
         }
 
 
