@@ -103,6 +103,8 @@ def apply_stage2_recovery(
             **routing,
             "routing_stage2_used": False,
             "topic_summary": "",
+            "stage2_prompt_text": "",
+            "stage2_output_text": "",
         }
 
     stage2 = route_stage2_topic(user_input, prompts_dir)
@@ -112,6 +114,8 @@ def apply_stage2_recovery(
         **routing,
         "routing_stage2_used": True,
         "topic_summary": topic_summary,
+        "stage2_prompt_text": stage2.get("stage2_prompt_text", ""),
+        "stage2_output_text": stage2.get("stage2_output_text", ""),
     }
 
     if recovered_primary_agent is None:
