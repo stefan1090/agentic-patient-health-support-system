@@ -1,39 +1,22 @@
 # Agentic Patient Health Support System
 
-A multi-agent patient-facing health support system designed to improve utility and safety by routing health questions to specialized agents.
+A modular patient-facing health support system that routes user questions to specialized response modules.
 
-**Developer:** Stefan Escobar, Physician and Master in Biomedical Informatics, focused on clinical AI evaluation.
+**Developer:** Stefan Escobar-Agreda, MD and MS in Biomedical and Health Informatics, focused on clinical AI evaluation.
 
-## What this project does
+## Overview
 
-This project explores a routing-first alternative to monolithic healthcare chatbots.
+Recent literature suggests that healthcare LLM systems are commonly adapted through prompt engineering, fine-tuning, retrieval-augmented generation, or hybrid approaches [1].
 
-Instead of treating every user query as one generic chatbot task, the system classifies the question first and routes it to the most appropriate specialized agent. It also separates urgent safety and emergency situations through a top-level overlay.
+This project explores whether an agentic routing-and-recovery design may be especially useful for realistic patient-facing inputs that are short, ambiguous, or mixed-intent [2].
 
-The goal is to improve:
-
-- **utility**, by reducing unnecessary refusal and making responses more relevant
-- **safety**, by prioritizing urgent situations separately
-- **precision**, by matching the response strategy to the actual type of patient question
-
-## Why a multi-agent system?
-
-Patient-facing health questions are heterogeneous. A single chatbot may need to handle:
-
-- symptoms and suspected conditions
-- test results
-- treatment questions
-- practical coping and day-to-day management
-- health system navigation
-- prevention and health literacy
-- urgent safety or emergency situations
-
-These needs require different levels of caution, structure, and actionability. This project uses a multi-agent design so each type of request can be handled more appropriately.
+Instead of treating every user message as the same generic task, the system first identifies the main type of need and then routes the request to the most appropriate response module. Urgent safety and emergency situations are handled separately through a top-level overlay.
 
 ## Routing taxonomy
 
-The current content agents are:
+The routing taxonomy in this repository was developed to capture common types of patient-facing health information needs.
 
+The current content modules are:
 - `clinical_assessment`
 - `interpretation`
 - `intervention`
@@ -42,66 +25,88 @@ The current content agents are:
 - `education`
 
 The system also applies a separate:
-
 - `safety_overlay`
 - `safety_level`
 
-### Clinical Assessment
-Symptoms, suspected illness, disease-specific questions, worsening, relapse, progression, or clinical meaning of a condition.
+### Clinical assessment
+Used for symptoms, signs, suspected illness, disease or condition mentions, abnormality, concern, or questions about whether something may be normal versus concerning.
 
 ### Interpretation
-Lab results, imaging, questionnaire scores, and diagnostic test findings.
+Used for lab results, imaging, questionnaire scores, screening scores, and diagnostic test findings.
 
 ### Intervention
-Questions centered on a specific intervention, such as medications, dose changes, therapies, supplements, or other concrete treatments.
+Used for treatment-oriented questions, including medications, prescriptions, therapies, supplements, concrete interventions, treatment changes, and intervention-related safety considerations.
 
 ### Management
-Practical actions, coping steps, day-to-day handling, implementation of a plan, or what to do right now.
+Used for practical actions, coping steps, day-to-day handling, implementation of a plan, and general low-risk management frameworks when the question is not centered on a specific intervention.
 
-### Health Services
-Patient-facing health system navigation, including referrals, access, specialists, insurance, coverage, eligibility, paperwork, and care pathways.
+### Health services
+Used for patient-facing health system navigation, including where to go, what type of provider or service is appropriate, referrals, access, insurance, coverage, benefits, eligibility, paperwork, and care pathways.
 
 ### Education
-Prevention, health promotion, healthy habits, health literacy, term meanings, abbreviations, and myths.
+Used for health promotion, healthy habits, general health literacy, meanings of medical terms, abbreviations, and myths.
 
-## Safety / emergency overlay
+## Safety and emergency overlay
 
 Urgent situations are handled separately from content routing.
 
 The overlay covers:
-- suicide or self-harm risk
-- inability to stay safe
-- harm to others
-- psychosis or severe behavioral disturbance with danger
-- abuse or violence with immediate danger
-- acute medical emergencies or potentially life-threatening events
 
-Examples include chest pain suggestive of heart attack, stroke symptoms, severe breathing difficulty, major trauma, severe bleeding, seizure emergency, loss of consciousness, or severe allergic reaction.
+- inability to stay safe
+- risk of self-harm
+- risk of harm to others
+- severe behavioral disturbance with immediate danger
+- abuse or violence with immediate danger
+- acute medical emergencies
+- other potentially life-threatening events
+
+Examples include chest pain suggestive of heart attack, stroke symptoms, severe breathing difficulty, severe bleeding, major trauma, seizure emergency, loss of consciousness, or severe allergic reaction.
 
 ## Architecture
 
 The system currently includes:
 
 - **Rules router**: deterministic baseline and fallback
-- **LLM router**: main routing backend
-- **Orchestrator**: applies the safety/emergency overlay first, then prepares the selected agent prompt
+- **Stage 1 router**: main LLM-based routing layer
+- **Stage 2 router**: secondary LLM-based recovery step for low-confidence cases
+- **Orchestrator**: applies the safety overlay first, then prepares the selected response module
 
-This is an **LLM-first** design with a rules-based fallback for robustness and debugging.
+The second routing stage exists because many patient-facing inputs are not well-formed questions. They may be short, implicit, fragmentary, or ambiguous. In those cases, the system first assigns an initial route and confidence level, and if confidence is low, a second routing step summarizes the main topic of the message and helps recover a more appropriate route.
 
-## Evaluation
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/958a0401-e5e9-4e92-b58e-da1eed561dbf" />
 
-The prototype has been tested on an initial set of **10 curated realistic health queries** using HealthBench-style cases for early routing validation.
+## Health services default context
 
-The goal of this initial evaluation was not to overfit to a benchmark, but to test whether the routing logic behaves sensibly across:
+The `health_services` module is designed to remain reusable, but when no country or health-system context is provided, it currently uses a general United States healthcare context by default.
 
-- mixed-intent health questions
-- symptom-based queries
-- intervention questions
-- navigation questions
-- practical management requests
-- safety and emergency scenarios
+This means the system may refer in general terms to pathways such as:
 
-The current system has reached a stable point where most remaining disagreements are **boundary cases**, not major architectural failures.
+- primary care
+- urgent care when clinically appropriate
+- specialist referral pathways
+- insurer member services
+- county or state public health or behavioral health resources
+- hospital or clinic patient navigation or social work support
+
+Exact access, referral rules, eligibility, benefits, and paperwork may still vary by state, county, insurer, and health system. The intent is to provide a useful default rather than a vague “it depends” response.
+
+## Safety and communication guardrails
+
+The current modules include several general guardrails:
+
+- **Clinical assessment** uses calm, non-alarmist language for highly stigmatized or commonly feared conditions
+- **Intervention** emphasizes caution against self-medication, antimicrobial resistance, especially with prescription-only, controlled, or otherwise higher-risk medications
+- **Education** is intentionally narrow and is not used as a broad fallback bucket for condition, evaluation, or intervention questions
+
+## Demo dataset
+
+The 10 demo cases included were extracted from HealthBench a public benchmark framework built around realistic health conversations for early testing and repository demos [3].
+
+The sample is included to show:
+
+- the expected input format
+- how the routing pipeline behaves
+- how to run the system in single-case and batch mode
 
 ## Repository structure
 
@@ -112,16 +117,16 @@ data/
   test_10.csv
 
 prompts/
-  clinical_assessment.txt
-  education.txt
+  a1_clinical_assessment.txt
+  a2_interpretation.txt
+  a3_intervention.txt
+  a4_management.txt
+  a5_health_services.txt
+  a6_education.txt
   emergency_overlay.txt
   global_rules.txt
-  health_services.txt
-  interpretation.txt
-  intervention.txt
-  management.txt
-  router_agent.txt
-  router.txt
+  router_stage1.txt
+  router_stage2.txt
 
 scripts/
   run_batch.py
@@ -131,26 +136,46 @@ src/
   export.py
   load_prompts.py
   orchestrator.py
-  router_llm.py
   router.py
+  router_llm.py
 ```
 
 ## How to run
 
 From the repository root:
 
-```bash
-python3 scripts/run_one.py --routing-backend llm "I think I have postpartum depression"
-python3 scripts/run_one.py --routing-backend rules "I think I have postpartum depression"
+python3 scripts/run_one.py --routing-backend llm "I think I have a serious rash and I do not know if I should get checked"
+python3 scripts/run_one.py --routing-backend rules "I think I have a serious rash and I do not know if I should get checked"
+
 python3 scripts/run_batch.py --routing-backend llm
 python3 scripts/run_batch.py --routing-backend rules
-```
+
+## Input format
+
+The included demo batch file uses a small CSV example.
+
+The system is intended to scale to larger datasets as long as they are converted into a compatible tabular structure, for example with a column containing the user message to be routed and processed.
 
 ## Current limitations
 
-- evaluation is still small and curated
-- routing is currently more mature than downstream full-answer generation
-- some agent-boundary ambiguities remain
-- caregiver framing is important but not yet formalized in the schema
-- no integrated retrieval or full RAG pipeline yet
-- no large-scale benchmark run yet
+* the system has been tested in a sinthetic evaluation setting (Healthbench) rather than real-world patient deployment
+* some module-boundary cases remain inherently debatable
+* retrieval is not yet integrated
+* service navigation defaults to a general U.S. context when no location or health-system context is provided
+* local service details still require verification at the insurer, health-system, county, or state level
+
+## Intended use
+
+This repository is designed as a research and prototyping framework for:
+
+* patient-facing health support
+* modular clinical GenAI workflows
+* evaluation of structured response strategies in health AI
+
+It is intended to be adaptable to other specialties, domains, and country-specific health system contexts.
+
+## References
+
+1. Pingua B, et al. Medical LLMs: Fine-Tuning vs Retrieval-Augmented Generation. 2025.
+2. Tran KT, Dao D, Nguyen MD, et al. Multi-Agent Collaboration Mechanisms: A Survey of LLMs. 2025.
+3. Arora RK, Wei J, Soskin Hicks R, et al. HealthBench: Evaluating Large Language Models Towards Improved Human Health. 2025.
